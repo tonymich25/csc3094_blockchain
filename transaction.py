@@ -1,11 +1,12 @@
 import json
 import hashlib
+import time
 
 
 class Transaction:
     def __init__(self, sender_id, nonce, payload, signatures, public_keys, algorithms):
-        self.sender_id = sender_id
-        self.nonce = nonce
+        self.sender_id = sender_id        # str
+        self.nonce = nonce                # int
         self.payload = payload            # bytes
         self.signatures = signatures      # list of bytes
         self.public_keys = public_keys    # list of bytes
@@ -15,7 +16,7 @@ class Transaction:
 
         self._unsigned_bytes = self._canonical_unsigned_bytes()
 
-        # Useful for logging, indexing, block inclusion, and dataset traceability
+        # Stable identifier for logging/indexing across runs (message id)
         self.tx_id = hashlib.sha256(self._unsigned_bytes).hexdigest()
 
     def _validate(self):
@@ -61,3 +62,14 @@ class Transaction:
     @property
     def unsigned_bytes(self):
         return self._unsigned_bytes
+
+    def to_dict(self):
+        return {
+            "sender_id": self.sender_id,
+            "nonce": self.nonce,
+            "payload": self.payload.hex(),
+            "signatures": [s.hex() for s in self.signatures],
+            "public_keys": [pk.hex() for pk in self.public_keys],
+            "algorithms": list(self.algorithms),
+            "tx_id": self.tx_id,
+        }
