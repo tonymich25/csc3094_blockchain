@@ -4,16 +4,6 @@ import time
 
 
 class Block:
-    """
-    Minimal, consistent block for your signature testbed.
-
-    Guarantees:
-    - deterministic block_hash (canonical JSON)
-    - hash-linked chaining via previous_hash
-    - stable transaction summary via tx_ids (from each tx.tx_id)
-    - validate_self() for catching accidental mutation
-    """
-
     def __init__(self, index, transactions, previous_hash, timestamp=None):
         self.index = int(index)
         self.timestamp = int(time.time() if timestamp is None else timestamp)
@@ -23,10 +13,7 @@ class Block:
 
         self._validate()
 
-        # Deterministic summary of contents
         self.tx_ids = [tx.tx_id for tx in self.transactions]
-
-        # Deterministic block header hash
         self.block_hash = self.compute_hash()
 
     def _validate(self):
@@ -40,8 +27,8 @@ class Block:
             raise TypeError("transactions must be a list")
 
         for tx in self.transactions:
-            if not hasattr(tx, "tx_id"):
-                raise TypeError("each transaction must have tx_id")
+            if not hasattr(tx, "tx_id") or not isinstance(tx.tx_id, str) or not tx.tx_id:
+                raise TypeError("each transaction must have a non-empty string tx_id")
 
     def header_dict(self):
         return {
@@ -60,12 +47,9 @@ class Block:
         return hashlib.sha256(header_bytes).hexdigest()
 
     def validate_self(self):
-        # Check tx_ids still match current transactions (detects add/remove/reorder)
         current_tx_ids = [tx.tx_id for tx in self.transactions]
         if current_tx_ids != self.tx_ids:
             return False
-
-        # Check stored hash matches recomputed hash
         return self.compute_hash() == self.block_hash
 
     def to_dict(self, include_transactions=True):
@@ -78,6 +62,13 @@ class Block:
         }
 
         if include_transactions:
-            d["transactions"] = [tx.to_dict() for tx in self.transactions]
+            tx_out = []
+            for tx in self.transactions:
+                if hasattr(tx, "to_dict") and callable(tx.to_dict):
+                    tx_out.append(tx.to_dict())
+                else:
+                    # Safe fallback for logging
+                    tx_out.append({"tx_id": tx.tx_id})
+            d["transactions"] = tx_out
 
         return d
