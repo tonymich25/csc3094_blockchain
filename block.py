@@ -62,13 +62,6 @@ class Block:
         }
 
         if include_transactions:
-            tx_out = []
-            for tx in self.transactions:
-                if hasattr(tx, "to_dict") and callable(tx.to_dict):
-                    tx_out.append(tx.to_dict())
-                else:
-                    # Safe fallback for logging
-                    tx_out.append({"tx_id": tx.tx_id})
-            d["transactions"] = tx_out
+            d["transactions"] = [tx.to_dict() for tx in self.transactions]
 
         return d
