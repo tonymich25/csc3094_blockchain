@@ -1,0 +1,17 @@
+Do i need a chain verifier func?
+
+Public key difference as well
+
+
+
+Nonce range
+Add:
+
+if self.nonce < 0: raise ValueError("nonce must be non-negative")
+
+Prevent accidental mutation during tests
+Rule: once created, don’t change fields. If you want a guard, you can document it, or later make it immutable. Not required now.
+
+
+
+Block batch size is consistent 50. If wanting to add variance (randomness to the size) it must be specified and reasoning behind why it would be important to test that.
