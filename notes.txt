@@ -15,3 +15,5 @@ Rule: once created, don’t change fields. If you want a guard, you can document
 
 
 Block batch size is consistent 50. If wanting to add variance (randomness to the size) it must be specified and reasoning behind why it would be important to test that.
+
+BLokcchain creates the block objects. Blocks are not passed to the blockcchain object as a final step, as is how normal applications are. Its done this way because its simpler and does not affect things.
