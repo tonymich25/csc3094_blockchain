@@ -3,19 +3,19 @@ import time
 
 
 class Blockchain:
-    def __init__(self, scheme_registry=None, genesis_previous_hash=None):
-        # Optional: {"ECDSA": scheme_obj, "Dilithium": scheme_obj, ...}
-        # scheme_obj must have: verify(pk_bytes, msg_bytes, sig_bytes) -> bool
+    def __init__(self, scheme_registry=None, block_size=50, genesis_previous_hash=None):
         self.scheme_registry = scheme_registry or {}
 
+        self.block_size = int(block_size)
+        if self.block_size <= 0:
+            raise ValueError("block_size must be > 0")
+
         self.chain = []
-        self.mempool = []
 
         prev = genesis_previous_hash
         if prev is None:
             prev = "0" * 64
 
-        # Genesis block
         genesis = Block(index=0, transactions=[], previous_hash=prev, timestamp=int(time.time()))
         self.chain.append(genesis)
 
@@ -23,20 +23,11 @@ class Blockchain:
     def head(self):
         return self.chain[-1]
 
-    def add_transaction(self, tx):
-        self.mempool.append(tx)
+    def commit_block(self, transactions, timestamp=None, verify_signatures=False, enforce_block_size=False):
+        transactions = list(transactions)
 
-    def commit_block(self, transactions=None, timestamp=None, verify_signatures=False):
-        """
-        Pattern A: Blockchain creates the Block.
-        - If transactions is None, consumes mempool and clears it.
-        - verify_signatures is optional correctness checking.
-        """
-        if transactions is None:
-            transactions = list(self.mempool)
-            self.mempool.clear()
-        else:
-            transactions = list(transactions)
+        if enforce_block_size and len(transactions) != self.block_size:
+            raise ValueError("expected exactly " + str(self.block_size) + " transactions, got " + str(len(transactions)))
 
         block = Block(
             index=len(self.chain),
@@ -50,15 +41,12 @@ class Blockchain:
         return block
 
     def _validate_block(self, block, expected_previous_hash, verify_signatures=False):
-        # 1) chain link
         if block.previous_hash != expected_previous_hash:
             raise ValueError("Invalid previous_hash link")
 
-        # 2) block integrity (tx_ids + block_hash)
         if not block.validate_self():
             raise ValueError("Block integrity check failed")
 
-        # 3) optional transaction signature verification
         if verify_signatures:
             for tx in block.transactions:
                 self._validate_transaction(tx)
@@ -80,7 +68,6 @@ class Blockchain:
         return True
 
     def validate_chain(self, verify_signatures=False):
-        # validate genesis integrity
         if not self.chain[0].validate_self():
             return False
 
@@ -95,11 +82,11 @@ class Blockchain:
 
     def to_dict(self, include_transactions=True):
         return {
-            "blocks": [b.to_dict(include_transactions=include_transactions) for b in self.chain]
+            "block_size": self.block_size,
+            "blocks": [b.to_dict(include_transactions=include_transactions) for b in self.chain],
         }
 
     def chain_size_bytes(self, include_transactions=True):
-        # Deterministic ledger size proxy via canonical JSON serialization
         chain_dict = [b.to_dict(include_transactions=include_transactions) for b in self.chain]
-        chain_bytes = json.dumps(chain_dict, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        return len(chain_bytes)
+        b = json.dumps(chain_dict, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return len(b)
