@@ -1,5 +1,6 @@
 import json
 import time
+from block import Block
 
 
 class Blockchain:
