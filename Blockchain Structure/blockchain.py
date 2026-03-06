@@ -68,7 +68,7 @@ class Blockchain:
 
         return True
 
-    def validate_chain(self, verify_signatures=False):
+    def validate_chain(self, verify_signatures=True):
         if not self.chain[0].validate_self():
             return False
 
