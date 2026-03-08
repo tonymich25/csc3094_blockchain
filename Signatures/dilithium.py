@@ -1,5 +1,13 @@
-import oqs
+import os
+import sys
 
+if sys.platform == "win32":
+    dll_dir = r"C:\Users\mtony\PycharmProjects\csc3094_blockchain\liboqs\cmake-build-debug\bin"
+    if os.path.isdir(dll_dir):
+        os.environ["PATH"] = dll_dir + os.pathsep + os.environ.get("PATH", "")
+        os.add_dll_directory(dll_dir)
+
+import oqs
 
 class DilithiumSignature:
     NAME = "ML-DSA-44"
