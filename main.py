@@ -1,13 +1,3 @@
-import os
-import sys
-
-DLL_DIR = r"C:\Users\mtony\PycharmProjects\csc3094_blockchain\liboqs\cmake-build-debug\bin"
-
-if sys.platform == "win32":
-    if os.path.isdir(DLL_DIR):
-        os.environ["PATH"] = DLL_DIR + os.pathsep + os.environ.get("PATH", "")
-        os.add_dll_directory(DLL_DIR)
-
 from Signatures.scheme_registry import scheme_registry
 from keystore import KeyStore
 from signing import TransactionSigner
