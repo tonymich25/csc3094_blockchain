@@ -5,7 +5,7 @@ from cryptography.exceptions import InvalidSignature
 
 
 class ECDSASignature:
-    NAME = "ECDSA-sepc256k1-SHA256"
+    NAME = "ECDSA-secp256k1-SHA256"
     ALGORITHM = "ECDSA"
     CURVE = "secp256k1"
     HASH = "SHA-256"
