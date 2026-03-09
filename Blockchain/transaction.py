@@ -19,6 +19,9 @@ class Transaction:
         # Stable identifier for logging/indexing across runs (message id)
         self.tx_id = hashlib.sha256(self._unsigned_bytes).hexdigest()
 
+    def __repr__(self):
+        return f"Transaction(tx_id={self.tx_id}, algos={self.algorithms}, payload_len={len(self.payload)})"
+
     def _validate(self):
         if not isinstance(self.sender_id, str) or not self.sender_id:
             raise ValueError("sender_id must be a non-empty string")
@@ -47,17 +50,14 @@ class Transaction:
         if len(self.signatures) != len(self.algorithms):
             raise ValueError("signatures and algorithms must have same length")
 
+    @staticmethod
+    def canonical_unsigned_bytes(sender_id, nonce, payload: bytes) -> bytes:
+        data = {"sender_id": sender_id, "nonce": nonce, "payload": payload.hex()}
+        import json
+        return json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
     def _canonical_unsigned_bytes(self):
-        data = {
-            "sender_id": self.sender_id,
-            "nonce": self.nonce,
-            "payload": self.payload.hex(),
-        }
-        return json.dumps(
-            data,
-            sort_keys=True,
-            separators=(",", ":")
-        ).encode("utf-8")
+        return Transaction.canonical_unsigned_bytes(self.sender_id, self.nonce, self.payload)
 
     @property
     def unsigned_bytes(self):
