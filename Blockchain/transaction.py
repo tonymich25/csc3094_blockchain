@@ -29,6 +29,9 @@ class Transaction:
         if not isinstance(self.nonce, int):
             raise TypeError("nonce must be an int")
 
+        if self.nonce < 0:
+            raise ValueError("nonce must be non-negative")
+
         if not isinstance(self.payload, bytes):
             raise TypeError("payload must be bytes")
 
