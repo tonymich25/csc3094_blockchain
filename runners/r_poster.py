@@ -9,7 +9,6 @@ from signing import TransactionSigner
 
 
 def make_payload(i: int, size: int) -> bytes:
-    # Deterministic payload: same (i, size) gives same bytes every run
     seed = (str(i) + ":" + str(size)).encode("utf-8")
     out = b""
     counter = 0
@@ -22,20 +21,15 @@ def make_payload(i: int, size: int) -> bytes:
 def generate_specs(n_txs: int):
     senders = ["Alice", "Bob", "Charlie", "Dave", "Eve", "Frank"]
     payload_sizes = [1024]
-
     nonces = {s: 0 for s in senders}
     specs = []
-
     for i in range(n_txs):
         sender = senders[i % len(senders)]
         nonce = nonces[sender]
         nonces[sender] += 1
-
         size = payload_sizes[i % len(payload_sizes)]
         payload = make_payload(i, size)
-
         specs.append((sender, nonce, payload))
-
     return specs
 
 
@@ -54,28 +48,45 @@ def p95(values):
     return s[idx]
 
 
+def measure_ecdsa_breakdown(txs, scheme):
+    print("\n--- ECDSA breakdown (first 10 txs) ---")
+    for i, tx in enumerate(txs[:10]):
+        pk = tx.public_keys[0]
+        msg = tx.unsigned_bytes
+        sig = tx.signatures[0]
+
+        scheme._pk_cache.clear()
+        t0 = time.perf_counter_ns()
+        scheme.verify(pk, msg, sig)
+        t1 = time.perf_counter_ns()
+        cold_ms = (t1 - t0) / 1e6
+
+        t0 = time.perf_counter_ns()
+        scheme.verify(pk, msg, sig)
+        t1 = time.perf_counter_ns()
+        warm_ms = (t1 - t0) / 1e6
+
+        print(f"tx {i}: cold={cold_ms:.4f}ms  warm={warm_ms:.4f}ms")
+    print("--------------------------------------\n")
+
+
 def measure_verify_and_sigsize(txs):
     per_tx_verify_ns = []
     per_tx_sig_bytes = []
 
     for tx in txs:
         msg = tx.unsigned_bytes
-
         tx_verify_ns = 0
         for algo, pk, sig in zip(tx.algorithms, tx.public_keys, tx.signatures):
             scheme = scheme_registry.get(algo)
             if scheme is None:
                 raise ValueError("Unknown scheme in tx.algorithms: " + str(algo))
-
             t0 = time.perf_counter_ns()
             ok = scheme.verify(pk, msg, sig)
             t1 = time.perf_counter_ns()
-
             if not ok:
                 raise RuntimeError("Verify failed: tx_id=" + tx.tx_id + " algo=" + str(algo))
-
             tx_verify_ns += (t1 - t0)
-
         per_tx_verify_ns.append(tx_verify_ns)
         per_tx_sig_bytes.append(sum(len(s) for s in tx.signatures))
 
@@ -84,7 +95,6 @@ def measure_verify_and_sigsize(txs):
 
 def summarize(mode: str, n_txs: int, verify_ns_list, sig_bytes_list):
     verify_ms = [v / 1e6 for v in verify_ns_list]
-
     return {
         "mode": mode,
         "n_txs": n_txs,
@@ -113,26 +123,32 @@ def main():
         ("hybrid", [ecdsa_key, pq_key]),
     ]
 
-    n_txs = 20  # change if you want, larger is smoother
+    n_txs = 100  # keep small for diagnostics
     specs = generate_specs(n_txs)
 
     keystore = KeyStore(scheme_registry)
     signer = TransactionSigner(scheme_registry, keystore)
 
-    summaries = []
+    # Build classical txs and run breakdown
+    classical_txs = build_transactions(specs, [ecdsa_key], signer)
+    print(f"unsigned_bytes length: {len(classical_txs[0].unsigned_bytes)} bytes")
+    ecdsa_scheme = scheme_registry[ecdsa_key]
+    measure_ecdsa_breakdown(classical_txs, ecdsa_scheme)
 
+    summaries = []
     for mode, algos in configs:
         txs = build_transactions(specs, algos, signer)
         verify_ns_list, sig_bytes_list = measure_verify_and_sigsize(txs)
         s = summarize(mode, n_txs, verify_ns_list, sig_bytes_list)
         summaries.append(s)
 
-        print("\nmode:", mode)
+        print("mode:", mode)
         print("verify ms/tx (mean):", s["verify_ms_mean"])
         print("verify ms/tx (median):", s["verify_ms_median"])
         print("verify ms/tx (p95):", s["verify_ms_p95"])
-        print("signature bytes/tx (mean):", s["sig_bytes_mean"])
-        print("signature bytes/tx (median):", s["sig_bytes_median"])
+        print("sig bytes/tx (mean):", s["sig_bytes_mean"])
+        print("sig bytes/tx (median):", s["sig_bytes_median"])
+        print()
 
     with open("poster_metrics.csv", "w", newline="", encoding="utf-8") as f:
         fieldnames = list(summaries[0].keys())
@@ -140,7 +156,7 @@ def main():
         w.writeheader()
         w.writerows(summaries)
 
-    print("\nSaved: poster_metrics.csv")
+    print("Saved: poster_metrics.csv")
 
 
 if __name__ == "__main__":
