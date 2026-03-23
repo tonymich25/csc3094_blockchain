@@ -55,8 +55,8 @@ class Transaction:
 
     @staticmethod
     def canonical_unsigned_bytes(sender_id, nonce, payload: bytes) -> bytes:
-        data = {"sender_id": sender_id, "nonce": nonce, "payload": payload.hex()}
-        import json
+        payload_hash = hashlib.sha256(payload).hexdigest()
+        data = {"sender_id": sender_id, "nonce": nonce, "payload_hash": payload_hash}
         return json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
     def _canonical_unsigned_bytes(self):
