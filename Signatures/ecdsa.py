@@ -12,8 +12,9 @@ class ECDSASignature:
 
     def __init__(self):
         self._pk_cache = {}
+        self._sk_cache = {}
+
     def generate_keypair(self):
-        # returns (secret_key_bytes, public_key_bytes)
         sk = ec.generate_private_key(ec.SECP256K1(), default_backend())
 
         sk_bytes = sk.private_bytes(
@@ -30,18 +31,25 @@ class ECDSASignature:
         return sk_bytes, pk_bytes
 
     def sign(self, secret_key_bytes, message):
-        sk = serialization.load_der_private_key(
-            secret_key_bytes, password=None, backend=default_backend()
-        )
+        sk = self._sk_cache.get(secret_key_bytes)
+        if sk is None:
+            sk = serialization.load_der_private_key(
+                secret_key_bytes, password=None, backend=default_backend()
+            )
+            self._sk_cache[secret_key_bytes] = sk
         return sk.sign(message, ec.ECDSA(hashes.SHA256()))
 
     def verify(self, public_key_bytes, message, signature):
+        print(f"cache size: {len(self._pk_cache)}, hit: {public_key_bytes in self._pk_cache}")
+
         try:
-            pk = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256K1(), public_key_bytes)
+            pk = self._pk_cache.get(public_key_bytes)
+            if pk is None:
+                pk = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256K1(), public_key_bytes)
+                self._pk_cache[public_key_bytes] = pk
             pk.verify(signature, message, ec.ECDSA(hashes.SHA256()))
             return True
         except InvalidSignature:
             return False
         except ValueError:
-            # bad key encoding, etc.
             return False
