@@ -69,3 +69,27 @@ Since there are only 6 authors, after the first 6 verifications the cache is ful
 
 
 whole digest thing
+
+
+
+
+
+Regarding commit "a710d6a7"
+
+Both versions always store the full payload in to_dict():
+python"payload": self.payload.hex()
+That never changes — the raw payload is always in the transaction record.
+The difference is in canonical_unsigned_bytes, which produces the bytes that get signed by the cryptographic algorithms and hashed into tx_id.
+Version 1 signs:
+json{"nonce": 1, "payload": "deadbeef...full hex...", "sender_id": "alice"}
+The full payload is embedded inside what gets signed. If payload is 10MB, you're signing 10MB of data.
+Version 2 signs:
+json{"nonce": 1, "payload_hash": "a3f1c2...", "sender_id": "alice"}
+Only a 64-character SHA-256 digest is embedded. The payload itself sits separately in the transaction record but is not directly in the signed bytes.
+Why version 2 is still secure — if anyone tampers with the payload, the SHA-256 digest won't match anymore, so the signature verification fails. The binding is just indirect rather than direct.
+Why version 2 is better practically:
+
+Fixed-size signed data regardless of payload size
+Dilithium and ECDSA both internally hash their input anyway, so version 1 is essentially double-encoding a potentially huge payload for no security gain
+Cleaner separation between "what identifies the transaction" and "what the transaction carries"
+
