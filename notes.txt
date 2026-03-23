@@ -17,3 +17,55 @@ Rule: once created, don’t change fields. If you want a guard, you can document
 Block batch size is consistent 50. If wanting to add variance (randomness to the size) it must be specified and reasoning behind why it would be important to test that.
 
 BLokcchain creates the block objects. Blocks are not passed to the blockcchain object as a final step, as is how normal applications are. Its done this way because its simpler and does not affect things.
+
+
+https://teams.microsoft.com/l/message/19:meeting_Y2U0YzYxNDktMjMzOS00NWMzLTg3MzQtN2FjZDY5MTYwNWVi@thread.v2/1773227187881?context=%7B%22contextType%22%3A%22chat%22%7D
+https://hackmd.io/@7dpNYqjKQGeYC7wMlPxHtQ/BykLXgq1s
+
+https://csrc.nist.gov/csrc/media/Projects/post-quantum-cryptography/documents/pqc-seminars/presentations/7-batch-me-if-you-pq-sign-07212023.pdf
+
+
+Do i add the replay protection thing with nonces to make it more real? "Nonces were included in the transaction structure and cryptographically bound to the signed message to support uniqueness and replay-resistance semantics. However, strict stateful nonce enforcement was not the primary focus of this testbed, whose main objective was comparative signature evaluation."
+
+
+In your JSON measurement, a few bytes of variation is normal because timestamps are different and you’re measuring a text format.
+
+
+CHECK PUBLIC KEY SIZE
+
+
+In the poster metric collection, i have put the public keys for ecdsa in memory as the specific library would have to reconstruct it from bytes, adding extra time/computation
+
+
+
+ECDSA verification performance is highly implementation-dependent. In our tests, Python cryptography produced substantially higher verification latency than a libsecp256k1-backed implementation, showing that library choice materially affects measured performance.
+
+
+
+
+https://link.springer.com/chapter/10.1007/978-3-642-31410-0_1
+
+
+https://eprint.iacr.org/2024/2011
+
+
+
+The same specs (sender, nonce, payload) are reused for all three modes. build_transactions just re-signs them with different algorithms each time.
+So the payloads are identical across classical, pq, and hybrid — which is the correct approach for a fair benchmark, since you're isolating the cost of the signature scheme, not the payload.
+
+
+
+
+When you have raw key bytes, before you can actually use them cryptographically you have to deserialise them — parse the DER encoding, validate the elliptic curve point, and construct a Python object that the cryptography library can work with. This takes time and happens every single call in version 1.
+Version 2 recognises that if you're going to be calling sign() and verify() many times, you're likely going to encounter the same keys repeatedly. So instead of throwing away the deserialised key object after each call and reconstructing it from scratch next time, it stores it in a dictionary keyed by the raw bytes.
+The next time the same key bytes come in, it finds the already-constructed object in the dictionary and uses it directly, completely bypassing the deserialisation step. The actual cryptographic operation — the signing or verification itself — still happens every time, only the setup work is skipped.
+In version 1, _pk_cache was declared in __init__ but never read from or written to anywhere, so it was essentially a mistake or an unfinished intention. Version 2 completes that intention for both the public and private key caches.
+
+
+When you call verify() with a public key, the raw bytes have to be parsed and validated as a point on the elliptic curve before they can be used. This is the expensive part.
+Without the cache, every single verification call does this parsing from scratch, even if you've seen that exact public key before.
+With the cache, the first time you see a public key you parse it and store the resulting object. Every subsequent call with the same key skips the parsing entirely and goes straight to the actual signature verification using the already-built object.
+Since there are only 6 authors, after the first 6 verifications the cache is fully warm and every remaining verification — across all 100 transactions — skips the parsing step completely.
+
+
+whole digest thing
