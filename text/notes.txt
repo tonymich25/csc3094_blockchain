@@ -93,3 +93,6 @@ Fixed-size signed data regardless of payload size
 Dilithium and ECDSA both internally hash their input anyway, so version 1 is essentially double-encoding a potentially huge payload for no security gain
 Cleaner separation between "what identifies the transaction" and "what the transaction carries"
 
+
+
+per-block timing
