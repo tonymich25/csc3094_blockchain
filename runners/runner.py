@@ -83,7 +83,7 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
     proc = get_process()
     rss_start = rss_bytes(proc)
     cpu_start = cpu_time_seconds(proc)
-    wall_start = time.perf_counter()
+    elapsed_start = time.perf_counter()
 
     keystore = KeyStore(scheme_registry)
     bc = Blockchain(scheme_registry=scheme_registry, block_size=block_size)
@@ -93,11 +93,11 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
     payload_sizes = [16, 32, 64, 128, 256]
 
     # Raw tuples collected during timed window - no dict/JSON overhead
-    # (i, sender, nonce, payload_len, algo, sign_ns, verify_ns, sig_len, pk_len)
+    # (mode, i, sender, nonce, payload_len, algo, sign_ns, verify_ns, sig_len, pk_len)
     raw_sig_results = []
-    # (i, tx_id, sender, nonce, payload_len, num_sigs, tx_sign_ns, tx_verify_ns, crypto_overhead)
+    # (mode, i, tx_id, sender, nonce, payload_len, num_sigs, tx_sign_ns, tx_verify_ns, crypto_overhead)
     raw_tx_results = []
-    # (block_index, block_size, commit_ns)
+    # (mode, block_index, block_size, commit_ns)
     raw_block_results = []
 
     total_sign_ns = 0
@@ -145,7 +145,6 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
             tx_sign_ns += sign_ns
             tx_verify_ns += verify_ns
 
-            # raw tuple only - no dict construction
             raw_sig_results.append((mode, i, sender, nonce, len(payload), algo, sign_ns, verify_ns, len(sig), len(pk)))
 
         total_sign_ns += tx_sign_ns
@@ -155,7 +154,6 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
 
         tx_crypto_overhead = sum(len(s) for s in signatures) + sum(len(pk) for pk in public_keys)
 
-        # raw tuple only - no dict construction or JSON serialization
         raw_tx_results.append((mode, i, tx.tx_id, sender, nonce, len(payload), len(signatures), tx_sign_ns, tx_verify_ns, tx_crypto_overhead))
 
         batch.append(tx)
@@ -173,15 +171,17 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
             block_index += 1
             batch = []
 
-    wall_end = time.perf_counter()
+    elapsed_end = time.perf_counter()
     cpu_end = cpu_time_seconds(proc)
     rss_end = rss_bytes(proc)
 
+    # Outside the timed window
+
     chain_ok = bc.validate_chain(verify_signatures=verify_correctness)
 
-    wall_total = wall_end - wall_start
-
-    # Outside the timed window
+    elapsed_total = elapsed_end - elapsed_start
+    cpu_total = cpu_end - cpu_start
+    crypto_seconds_total = (total_sign_ns + total_verify_ns) / 1e9
 
     summary = {
         "mode": mode,
@@ -189,15 +189,19 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
         "block_size": block_size,
         "blocks_total_including_genesis": len(bc.chain),
         "validate_chain": bool(chain_ok),
-        "wall_seconds_total": wall_total,
+        "elapsed_seconds_total": elapsed_total,
         "sign_seconds_total": total_sign_ns / 1e9,
         "verify_seconds_total": total_verify_ns / 1e9,
         "commit_seconds_total": total_commit_ns / 1e9,
-        "tps_end_to_end_wall": (n_txs / wall_total) if wall_total > 0 else None,
+        "crypto_seconds_total": crypto_seconds_total,
+        "tps_end_to_end": (n_txs / elapsed_total) if elapsed_total > 0 else None,
+        "tps_crypto_only": (n_txs / crypto_seconds_total) if crypto_seconds_total > 0 else None,
         "rss_start_bytes": rss_start,
         "rss_end_bytes": rss_end,
+        "rss_delta_bytes": rss_end - rss_start,
         "cpu_start_seconds": cpu_start,
         "cpu_end_seconds": cpu_end,
+        "cpu_seconds_total": cpu_total,
         "chain_size_bytes_json": bc.chain_size_bytes(include_transactions=True),
     }
 
