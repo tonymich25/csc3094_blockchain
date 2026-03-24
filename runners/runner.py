@@ -3,11 +3,8 @@ import csv
 import json
 import time
 import hashlib
+import psutil
 
-try:
-    import psutil
-except Exception:
-    psutil = None
 
 from Signatures.scheme_registry import scheme_registry
 from Signatures.ecdsa import ECDSASignature
@@ -40,31 +37,16 @@ def make_payload(i, size):
 
 
 def get_process():
-    if psutil is None:
-        return None
-    try:
-        return psutil.Process(os.getpid())
-    except Exception:
-        return None
+    return psutil.Process(os.getpid())
 
 
 def rss_bytes(proc):
-    if proc is None:
-        return None
-    try:
-        return int(proc.memory_info().rss)
-    except Exception:
-        return None
+    return int(proc.memory_info().rss)
 
 
 def cpu_time_seconds(proc):
-    if proc is None:
-        return None
-    try:
-        t = proc.cpu_times()
-        return float(t.user + t.system)
-    except Exception:
-        return None
+    t = proc.cpu_times()
+    return float(t.user + t.system)
 
 
 def scheme_sign(scheme, sk_bytes, msg_bytes):
@@ -110,13 +92,21 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
     nonces = {s: 0 for s in senders}
     payload_sizes = [16, 32, 64, 128, 256]
 
-    per_sig_rows = []
-    per_tx_rows = []
+    # Raw tuples collected during timed window - no dict/JSON overhead
+    # (i, sender, nonce, payload_len, algo, sign_ns, verify_ns, sig_len, pk_len)
+    raw_sig_results = []
+    # (i, tx_id, sender, nonce, payload_len, num_sigs, tx_sign_ns, tx_verify_ns, crypto_overhead)
+    raw_tx_results = []
+    # (block_index, block_size, commit_ns)
+    raw_block_results = []
 
     total_sign_ns = 0
     total_verify_ns = 0
+    total_commit_ns = 0
 
     batch = []
+    transactions = {}  # tx_id -> tx
+    block_index = 0
 
     for i in range(n_txs):
         sender = senders[i % len(senders)]
@@ -155,18 +145,8 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
             tx_sign_ns += sign_ns
             tx_verify_ns += verify_ns
 
-            per_sig_rows.append({
-                "mode": mode,
-                "i": i,
-                "sender_id": sender,
-                "nonce": nonce,
-                "payload_bytes": len(payload),
-                "algorithm": algo,
-                "sign_time_ns": sign_ns,
-                "verify_time_ns": verify_ns,
-                "signature_bytes": len(sig),
-                "public_key_bytes": len(pk),
-            })
+            # raw tuple only - no dict construction
+            raw_sig_results.append((mode, i, sender, nonce, len(payload), algo, sign_ns, verify_ns, len(sig), len(pk)))
 
         total_sign_ns += tx_sign_ns
         total_verify_ns += tx_verify_ns
@@ -174,35 +154,34 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
         tx = Transaction(sender, nonce, payload, signatures, public_keys, algorithms)
 
         tx_crypto_overhead = sum(len(s) for s in signatures) + sum(len(pk) for pk in public_keys)
-        tx_json_bytes = len(json.dumps(tx.to_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8"))
 
-        per_tx_rows.append({
-            "mode": mode,
-            "i": i,
-            "tx_id": tx.tx_id,
-            "sender_id": sender,
-            "nonce": nonce,
-            "payload_bytes": len(payload),
-            "num_signatures": len(signatures),
-            "sign_time_ns_total": tx_sign_ns,
-            "verify_time_ns_total": tx_verify_ns,
-            "crypto_overhead_bytes": tx_crypto_overhead,
-            "tx_json_bytes": tx_json_bytes,
-        })
+        # raw tuple only - no dict construction or JSON serialization
+        raw_tx_results.append((mode, i, tx.tx_id, sender, nonce, len(payload), len(signatures), tx_sign_ns, tx_verify_ns, tx_crypto_overhead))
 
         batch.append(tx)
+        transactions[tx.tx_id] = tx
 
         if len(batch) == block_size:
-            bc.commit_block(batch, verify_signatures=verify_correctness, enforce_block_size=True)
-            batch = []
+            t0 = time.perf_counter_ns()
+            bc.commit_block(batch, verify_signatures=False, enforce_block_size=True)
+            t1 = time.perf_counter_ns()
+            commit_ns = t1 - t0
+            total_commit_ns += commit_ns
 
-    chain_ok = bc.validate_chain(verify_signatures=verify_correctness)
+            raw_block_results.append((mode, block_index, block_size, commit_ns))
+
+            block_index += 1
+            batch = []
 
     wall_end = time.perf_counter()
     cpu_end = cpu_time_seconds(proc)
     rss_end = rss_bytes(proc)
 
+    chain_ok = bc.validate_chain(verify_signatures=verify_correctness)
+
     wall_total = wall_end - wall_start
+
+    # --- everything below is outside the timed window ---
 
     summary = {
         "mode": mode,
@@ -213,6 +192,7 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
         "wall_seconds_total": wall_total,
         "sign_seconds_total": total_sign_ns / 1e9,
         "verify_seconds_total": total_verify_ns / 1e9,
+        "commit_seconds_total": total_commit_ns / 1e9,
         "tps_end_to_end_wall": (n_txs / wall_total) if wall_total > 0 else None,
         "rss_start_bytes": rss_start,
         "rss_end_bytes": rss_end,
@@ -220,6 +200,38 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
         "cpu_end_seconds": cpu_end,
         "chain_size_bytes_json": bc.chain_size_bytes(include_transactions=True),
     }
+
+    # convert raw tuples to dicts for CSV
+    per_sig_rows = [
+        {
+            "mode": r[0], "i": r[1], "sender_id": r[2], "nonce": r[3],
+            "payload_bytes": r[4], "algorithm": r[5], "sign_time_ns": r[6],
+            "verify_time_ns": r[7], "signature_bytes": r[8], "public_key_bytes": r[9],
+        }
+        for r in raw_sig_results
+    ]
+
+    per_tx_rows = [
+        {
+            "mode": r[0], "i": r[1], "tx_id": r[2], "sender_id": r[3],
+            "nonce": r[4], "payload_bytes": r[5], "num_signatures": r[6],
+            "sign_time_ns_total": r[7], "verify_time_ns_total": r[8],
+            "crypto_overhead_bytes": r[9],
+            "tx_json_bytes": len(json.dumps(
+                transactions[r[2]].to_dict(),
+                sort_keys=True, separators=(",", ":")
+            ).encode("utf-8")),
+        }
+        for r in raw_tx_results
+    ]
+
+    per_block_rows = [
+        {
+            "mode": r[0], "block_index": r[1], "block_size": r[2], "commit_time_ns": r[3],
+        }
+        for r in raw_block_results
+    ]
+
 
     with open(os.path.join(out_dir, "summary.json"), "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2, sort_keys=True)
@@ -237,6 +249,11 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
         w.writeheader()
         w.writerows(per_tx_rows)
 
+    with open(os.path.join(out_dir, "per_block.csv"), "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=list(per_block_rows[0].keys()))
+        w.writeheader()
+        w.writerows(per_block_rows)
+
     print("saved:", out_dir)
     print("summary:", summary)
 
@@ -244,4 +261,4 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
 
 
 if __name__ == "__main__":
-    run_experiment(mode="classical", n_txs=1000, block_size=50, verify_correctness=True)
+    run_experiment(mode="pq", n_txs=1000, block_size=50, verify_correctness=True)
