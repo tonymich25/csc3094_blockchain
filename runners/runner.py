@@ -181,7 +181,7 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
 
     wall_total = wall_end - wall_start
 
-    # --- everything below is outside the timed window ---
+    # Outside the timed window
 
     summary = {
         "mode": mode,
