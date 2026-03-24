@@ -1,0 +1,103 @@
+1) Proper output folder per run
+
+Right now you overwrite:
+
+chain_hybrid.json
+
+You need run IDs so you can keep results from multiple runs.
+
+Example output layout:
+
+runs/2026-03-10_1842_hybrid_bs50_n1000/chain.json
+
+runs/.../config.json
+
+2) A config object you save with every run
+
+So every output folder contains the exact parameters:
+
+mode (classical/pq/hybrid)
+
+block_size
+
+n_txs
+
+payload_sizes
+
+sender list
+
+library versions (optional)
+
+This is essential for reproducibility.
+
+3) CLI arguments
+
+So you don’t keep editing the file to change:
+
+n_txs = 1000
+
+block_size = 25/50
+
+mode
+
+Minimal CLI:
+
+--mode hybrid
+
+--n 1000
+
+--block-size 50
+
+--verify
+
+--allow-partial-blocks
+
+4) A consistent “transaction input dataset” concept
+
+Right now your tx inputs are generated inside the run.
+
+That’s okay, but later you’ll want:
+
+generate the same tx inputs once
+
+reuse them across classical, pq, hybrid
+So comparisons are fair.
+
+So you want either:
+
+save “inputs.jsonl” (sender_id, nonce, payload_hex)
+or
+
+a fixed seed and fixed generator parameters saved to config
+
+5) Key management policy across runs
+
+Decide and make it explicit:
+
+Keys regenerated each run (fine, common)
+or
+
+Keys fixed per sender across all runs (more controlled)
+
+Both are valid, but you must pick and document it.
+
+6) A “scheme interface contract” check
+
+Before starting a run, validate the registry entries support:
+
+generate_keypair
+
+sign
+
+verify
+
+This avoids a run failing halfway.
+
+7) Optional but useful: load/replay
+
+Not mandatory, but nice:
+
+load a saved inputs.jsonl
+
+rebuild + re-sign under different mode
+This makes your experiments cleaner later.
