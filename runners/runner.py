@@ -80,10 +80,6 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
         out_dir = os.path.join("../runs", now_run_id() + "_" + mode + "_n" + str(n_txs) + "_bs" + str(block_size))
     ensure_dir(out_dir)
 
-    proc = get_process()
-    rss_start = rss_bytes(proc)
-    cpu_start = cpu_time_seconds(proc)
-    elapsed_start = time.perf_counter()
 
     keystore = KeyStore(scheme_registry)
     bc = Blockchain(scheme_registry=scheme_registry, block_size=block_size)
@@ -108,15 +104,25 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
     transactions = {}  # tx_id -> tx
     block_index = 0
 
+    payloads = [make_payload(i, payload_sizes[i % len(payload_sizes)]) for i in range(n_txs)]
+
+    # Key gen outside of timer
+    for sender in senders:
+        keystore.ensure_sender_keys(sender, algo_list)
+
+    # --- TIMER START ---
+    proc = get_process()
+    rss_start = rss_bytes(proc)
+    cpu_start = cpu_time_seconds(proc)
+    elapsed_start = time.perf_counter()
+
+
     for i in range(n_txs):
         sender = senders[i % len(senders)]
         nonce = nonces[sender]
         nonces[sender] += 1
 
-        psize = payload_sizes[i % len(payload_sizes)]
-        payload = make_payload(i, psize)
-
-        keystore.ensure_sender_keys(sender, algo_list)
+        payload = payloads[i]
 
         msg = Transaction.canonical_unsigned_bytes(sender, nonce, payload)
 
@@ -175,7 +181,7 @@ def run_experiment(mode, n_txs, block_size, verify_correctness=True, out_dir=Non
     cpu_end = cpu_time_seconds(proc)
     rss_end = rss_bytes(proc)
 
-    # Outside the timed window
+    # --- TIMER STOP ---
 
     chain_ok = bc.validate_chain(verify_signatures=verify_correctness)
 
