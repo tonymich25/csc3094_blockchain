@@ -111,3 +111,21 @@ Supervisor mentioned that ECDSA can now be cracked or something (said this 2/4)
 3. Jacobian coordinates — already done for you
 Any serious library handles this. Mentioning it because you'd feel it immediately if it were missing — affine arithmetic would be roughly 10× slower. Just make sure you're using a production library like libsecp256k1, not rolling your own.
 Maybe what cryptography library was doing ^
+
+
+
+ECDSA
+The best optimisations, ranked honestly
+The answer depends on your context, but if forced to rank by impact:
+1. Precomputed G tables — biggest single win, essentially free
+Since G never changes, you pay the precomputation once at build time and every k·G operation becomes fast table lookups forever. This touches every single signature verification. No tradeoffs, no complexity cost worth worrying about. Do this unconditionally.
+2. GLV endomorphism — massive gain, secp256k1 specific
+Halves the effective scalar size, which roughly halves the cost of every scalar multiplication. The endomorphism itself is nearly free to compute on secp256k1. Again, no real tradeoff. Combined with precomputed tables this is your baseline — everything else builds on top of these two.
+3. Jacobian coordinates — already done for you
+Any serious library handles this. Mentioning it because you'd feel it immediately if it were missing — affine arithmetic would be roughly 10× slower. Just make sure you're using a production library like libsecp256k1, not rolling your own.
+4. Pippenger batching — transformative at scale
+Once you're dealing with hundreds of signatures at a time (block validation, IBD, rollup sequencers), this changes the economics entirely. The O(n / log n) scaling means at n=1000 you're doing roughly 15-20% of the work of naive verification. The cost is implementation complexity and the all-or-nothing result issue.
+5. Parallelism across cores — compounds everything above
+Conceptually simple, practically very impactful. All the above optimisations apply per-core, so 8 cores running Pippenger batches simultaneously multiplies your throughput further. Bitcoin Core's IBD is the canonical real-world example of this working well.
+6. Mempool caching — not cryptographic, but practically huge
+Skipping re-verification of already-seen transactions is arguably the biggest real-world throughput gain in production blockchain nodes, but it's an engineering/caching problem rather than a cryptographic one.
