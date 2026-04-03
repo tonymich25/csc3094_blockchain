@@ -96,3 +96,18 @@ Cleaner separation between "what identifies the transaction" and "what the trans
 
 
 per-block timing
+
+
+
+derive stuff on the fly (compute)
+
+
+show public and private key sizes of signatures
+
+
+Supervisor mentioned that ECDSA can now be cracked or something (said this 2/4)
+
+
+3. Jacobian coordinates — already done for you
+Any serious library handles this. Mentioning it because you'd feel it immediately if it were missing — affine arithmetic would be roughly 10× slower. Just make sure you're using a production library like libsecp256k1, not rolling your own.
+Maybe what cryptography library was doing ^
