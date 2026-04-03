@@ -129,3 +129,8 @@ Once you're dealing with hundreds of signatures at a time (block validation, IBD
 Conceptually simple, practically very impactful. All the above optimisations apply per-core, so 8 cores running Pippenger batches simultaneously multiplies your throughput further. Bitcoin Core's IBD is the canonical real-world example of this working well.
 6. Mempool caching — not cryptographic, but practically huge
 Skipping re-verification of already-seen transactions is arguably the biggest real-world throughput gain in production blockchain nodes, but it's an engineering/caching problem rather than a cryptographic one.
+
+
+
+Parallelism across cores — we tried this with threading. It made things worse because the individual work units are too small.
+Maybe saying that having more/bigger transactions/block sizes would be worthwhile.
