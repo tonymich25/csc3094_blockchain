@@ -8,6 +8,7 @@ import psutil
 from Signatures.scheme_registry import scheme_registry
 from Signatures.ecdsa import ECDSASignature
 from Signatures.dilithium import DilithiumSignature
+from Signatures.falcon import FalconSignature
 
 from Blockchain.blockchain import Blockchain
 from Blockchain.transaction import Transaction
@@ -15,6 +16,7 @@ from keystore import KeyStore
 
 ECDSA_KEY = ECDSASignature.NAME
 PQC_KEY = DilithiumSignature.NAME
+FALCON_KEY = FalconSignature.NAME
 
 
 def ensure_dir(path):
@@ -67,10 +69,16 @@ def run_experiment(mode, n_txs, block_size, verify_mode="scheme", verify_correct
         algo_list = [ECDSA_KEY]
     elif mode == "pq":
         algo_list = [PQC_KEY]
+    elif mode == "falcon":
+        algo_list = [FALCON_KEY]
     elif mode == "hybrid":
         algo_list = [ECDSA_KEY, PQC_KEY]
+    elif mode == "hybrid_falcon":
+        algo_list = [ECDSA_KEY, FALCON_KEY]
+    elif mode == "hybrid_all":
+        algo_list = [ECDSA_KEY, PQC_KEY, FALCON_KEY]
     else:
-        raise ValueError("mode must be: classical, pq, hybrid")
+        raise ValueError("mode must be: classical, pq, falcon, hybrid, hybrid_falcon, hybrid_all")
 
     if verify_mode not in ("scheme", "commit", "none"):
         raise ValueError("verify_mode must be: scheme, commit, none")
@@ -291,7 +299,6 @@ def run_experiment(mode, n_txs, block_size, verify_mode="scheme", verify_correct
         "cpu_end_seconds": cpu_end,
         "cpu_seconds_total": cpu_total,
         "chain_size_bytes_json": bc.chain_size_bytes(include_transactions=True),
-        # fixed per algo — one value per algorithm, keyed by algo name
         "sig_bytes":  {r[6]: r[9]  for r in raw_sig_results},
         "pk_bytes":   {r[6]: r[10] for r in raw_sig_results},
         "tx_bytes":   per_tx_rows[0]["tx_json_bytes"],
@@ -363,8 +370,8 @@ def run_experiment(mode, n_txs, block_size, verify_mode="scheme", verify_correct
 
 if __name__ == "__main__":
     run_experiment(
-        mode="hybrid", # "classical", "pq", or "hybrid"
-        n_txs=10000,
+        mode="hybrid_all",          # "classical", "pq", "falcon", "hybrid", "hybrid_falcon", "hybrid_all"
+        n_txs=100000,
         block_size=1000,
         verify_mode="scheme",   # "scheme", "commit", or "none"
         verify_correctness=True
