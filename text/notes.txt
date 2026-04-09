@@ -148,3 +148,19 @@ Collect:
 signature size
 public key size
 transaction size
+
+
+Its easy to add classes/signatures now and so more signatures can be evaluated together
+
+
+
+Falcon beating ECDSA on verify is expected. Falcon's verify is just a polynomial multiplication and a norm check, which is extremely cheap — especially if your liboqs build has AVX2 enabled. ECDSA verify requires a full elliptic curve scalar multiplication, which is inherently more expensive. So Falcon at 11µs vs ECDSA at 23µs is the correct ordering, not a surprise.
+Falcon's 654 byte signature is variable. Falcon-512 signatures are not fixed size — they're roughly 600–900 bytes depending on the random signing process that run. 654 is on the smaller/normal end. If you look at your per_signature.csv you'll likely see it fluctuate slightly across transactions, unlike ECDSA which is always exactly 64 bytes and Dilithium which is always exactly 2420 bytes.
+
+
+
+SLH-DSA / SPHINCS+
+Mention in literature review / discussion
+Usually not worth implementing for blockchain benchmarking because signature sizes are huge unless you specifically want a hash-based PQ family comparison
+
+ALl nist standardised as they are...
