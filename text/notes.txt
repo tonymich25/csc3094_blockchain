@@ -141,3 +141,10 @@ https://arxiv.org/abs/2603.28846
 
 william
 thomas - professor
+
+
+
+Collect:
+signature size
+public key size
+transaction size
