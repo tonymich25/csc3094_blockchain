@@ -138,3 +138,6 @@ Maybe saying that having more/bigger transactions/block sizes would be worthwhil
 
 
 https://arxiv.org/abs/2603.28846
+
+william
+thomas - professor
