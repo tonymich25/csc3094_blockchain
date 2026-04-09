@@ -16,7 +16,7 @@ Rule: once created, don’t change fields. If you want a guard, you can document
 
 Block batch size is consistent 50. If wanting to add variance (randomness to the size) it must be specified and reasoning behind why it would be important to test that.
 
-BLokcchain creates the block objects. Blocks are not passed to the blockcchain object as a final step, as is how normal applications are. Its done this way because its simpler and does not affect things.
+BLockchain creates the block objects. Blocks are not passed to the blockcchain object as a final step, as is how normal applications are. Its done this way because its simpler and does not affect things.
 
 
 https://teams.microsoft.com/l/message/19:meeting_Y2U0YzYxNDktMjMzOS00NWMzLTg3MzQtN2FjZDY5MTYwNWVi@thread.v2/1773227187881?context=%7B%22contextType%22%3A%22chat%22%7D
@@ -134,3 +134,7 @@ Skipping re-verification of already-seen transactions is arguably the biggest re
 
 Parallelism across cores — we tried this with threading. It made things worse because the individual work units are too small.
 Maybe saying that having more/bigger transactions/block sizes would be worthwhile.
+
+
+
+https://arxiv.org/abs/2603.28846
