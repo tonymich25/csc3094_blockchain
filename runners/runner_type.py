@@ -236,6 +236,30 @@ def run_experiment(mode, n_txs, block_size, verify_mode="scheme", verify_correct
     cpu_total = cpu_end - cpu_start
     crypto_seconds_total = (total_sign_ns + total_scheme_verify_ns) / 1e9
 
+    per_tx_rows = [
+        {
+            "mode": r[0],
+            "verify_mode": r[1],
+            "i": r[2],
+            "tx_id": r[3],
+            "sender_id": r[4],
+            "nonce": r[5],
+            "payload_bytes": r[6],
+            "num_signatures": r[7],
+            "sign_time_ns_total": r[8],
+            "scheme_verify_time_ns_total": r[9],
+            "crypto_overhead_bytes": r[10],
+            "tx_json_bytes": len(
+                json.dumps(
+                    transactions[r[3]].to_dict(),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ),
+        }
+        for r in raw_tx_results
+    ]
+
     summary = {
         "mode": mode,
         "verify_mode": verify_mode,
@@ -267,6 +291,10 @@ def run_experiment(mode, n_txs, block_size, verify_mode="scheme", verify_correct
         "cpu_end_seconds": cpu_end,
         "cpu_seconds_total": cpu_total,
         "chain_size_bytes_json": bc.chain_size_bytes(include_transactions=True),
+        # fixed per algo — one value per algorithm, keyed by algo name
+        "sig_bytes":  {r[6]: r[9]  for r in raw_sig_results},
+        "pk_bytes":   {r[6]: r[10] for r in raw_sig_results},
+        "tx_bytes":   per_tx_rows[0]["tx_json_bytes"],
         "notes": {
             # "scheme_mode": "scheme_verify_seconds_total is populated; commit_seconds_total excludes signature verification during commit",
             # "commit_mode": "scheme_verify_seconds_total is zero; commit_seconds_total includes signature verification during commit",
@@ -289,30 +317,6 @@ def run_experiment(mode, n_txs, block_size, verify_mode="scheme", verify_correct
             "public_key_bytes": r[10],
         }
         for r in raw_sig_results
-    ]
-
-    per_tx_rows = [
-        {
-            "mode": r[0],
-            "verify_mode": r[1],
-            "i": r[2],
-            "tx_id": r[3],
-            "sender_id": r[4],
-            "nonce": r[5],
-            "payload_bytes": r[6],
-            "num_signatures": r[7],
-            "sign_time_ns_total": r[8],
-            "scheme_verify_time_ns_total": r[9],
-            "crypto_overhead_bytes": r[10],
-            "tx_json_bytes": len(
-                json.dumps(
-                    transactions[r[3]].to_dict(),
-                    sort_keys=True,
-                    separators=(",", ":"),
-                ).encode("utf-8")
-            ),
-        }
-        for r in raw_tx_results
     ]
 
     per_block_rows = [
@@ -360,7 +364,7 @@ def run_experiment(mode, n_txs, block_size, verify_mode="scheme", verify_correct
 if __name__ == "__main__":
     run_experiment(
         mode="hybrid", # "classical", "pq", or "hybrid"
-        n_txs=100000,
+        n_txs=10000,
         block_size=1000,
         verify_mode="scheme",   # "scheme", "commit", or "none"
         verify_correctness=True
