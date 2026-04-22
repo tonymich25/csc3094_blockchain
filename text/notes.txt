@@ -164,3 +164,28 @@ Mention in literature review / discussion
 Usually not worth implementing for blockchain benchmarking because signature sizes are huge unless you specifically want a hash-based PQ family comparison
 
 ALl nist standardised as they are...
+
+
+
+https://developer.bitcoin.org/devguide/transactions.html
+do i mention i ran on a second computer?
+
+
+remove verify correctness
+FAlcon size number range (600-900bytes)
+
+
+
+It is not bad but it is a limitation worth being honest about. The key point is that all configurations are measured using the same JSON serialisation approach, so the comparison between configurations is still fair and valid — Dilithium will still show larger storage than ECDSA, and hybrid will still show larger than post-quantum-only. The absolute numbers just do not represent actual on-disk binary storage.
+The honest way to frame it is exactly what we already have — state that it is JSON serialised byte length, acknowledge it does not represent binary on-disk size, but note that since all configurations are measured identically the relative comparisons remain meaningful. That is already in the current text so nothing needs changing.
+Where it matters is in your results chapter — when you present chain size figures you should note that they reflect JSON representation and that real-world storage in a production system using binary encoding would differ, but the relative differences between configurations would be expected to follow the same pattern. That is an honest and defensible position.
+
+
+appendixes
+
+One thing was removed that should have stayed — the liboqs version mismatch paragraph originally ended with: "It is possible that it contributed to the unreliable SPHINCS+ results described in section 3.5, though this cannot be confirmed and no claim is made about causation."
+
+
+So the higher throughput in commit-level is a real and explainable finding — it reflects the efficiency benefit of batching verification at the block level rather than interleaving it with signing in the transaction loop. This is actually an interesting result worth discussing in 4.2 and 4.3 because it has implications for how verification should be placed in a real blockchain system.
+
+Mention in backgroudn research about ther ebeing 3 standardised signatures
