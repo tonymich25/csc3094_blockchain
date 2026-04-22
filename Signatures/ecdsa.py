@@ -15,10 +15,10 @@ class ECDSASignature:
     def generate_keypair(self):
         sk = PrivateKey()
         sk_bytes = sk.secret  # 32 bytes (raw private key)
-        pk_bytes = sk.public_key.format(compressed=False)  # 65 bytes (uncompressed)
+        pk_bytes = sk.public_key.format(compressed=True)  # 65 bytes (uncompressed)
         return sk_bytes, pk_bytes
 
-    def _hash_message(self, message: bytes) -> bytes:
+    def _hash_message(self, message):
         return hashlib.sha256(message).digest()
 
     def sign(self, secret_key_bytes, message):
